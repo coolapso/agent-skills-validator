@@ -144,7 +144,7 @@ jobs:
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `path` | `.` | Skill directory to validate. |
-| `version` | Pinned per action release | CLI release to download. Use `latest` for the newest release. |
+| `version` | Follows the action ref | CLI release to download: `1.2.3`, `v1` (newest 1.x) or `latest`. Empty follows the action ref, so `@v1.2.3` runs CLI 1.2.3 and `@v1` the newest 1.x. |
 | `strict` | `false` | Pass `--strict`. |
 | `fail-on-warnings` | `false` | Pass `--fail-on-warnings`. |
 | `format` | `text` | CLI output format. With `json` the report is also exposed as action outputs. |
@@ -211,10 +211,11 @@ Downloads the latest release, verifies the checksum and installs to `/usr/local/
 curl -fsSL https://agent-skills-validator.coolapso.sh/install.sh | bash
 ```
 
-Pin a version or change the destination:
+Pin a version, follow a line, or change the destination:
 
 ```sh
-curl -fsSL https://agent-skills-validator.coolapso.sh/install.sh | VERSION=v1.0.0 INSTALL_DIR=~/.local/bin bash
+curl -fsSL https://agent-skills-validator.coolapso.sh/install.sh | VERSION=v1.0.0 bash
+curl -fsSL https://agent-skills-validator.coolapso.sh/install.sh | VERSION=v1 INSTALL_DIR=~/.local/bin bash
 ```
 
 Uninstall with `curl -fsSL https://agent-skills-validator.coolapso.sh/uninstall.sh | bash`.
@@ -283,9 +284,9 @@ task release:dry-run   # preview the next version and notes
 task release           # checks, semrel tag + GitHub release, GoReleaser artifacts, move v1 tag
 ```
 
-[semrel](https://semrel.io) computes the version, pins the action's default CLI version in
-`action.yaml`, tags and creates the GitHub release with generated notes (no changelog file is
-committed).
+[semrel](https://semrel.io) computes the version, tags and creates the GitHub release with
+generated notes. Release runs never commit anything: no changelog file, no version bumps. The
+action reads the CLI version from its own tag at runtime instead.
 [GoReleaser](https://goreleaser.com) then builds the binaries, archives, checksums, `.deb`/`.rpm`
 packages and the AUR package and attaches them to that release. Finally the multi-arch container
 image is pushed to the GitHub Container Registry and Docker Hub. A token is taken from

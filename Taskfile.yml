@@ -254,7 +254,6 @@ tasks:
 
   release:next-version:
     desc: "Print the next version semrel would release (empty when nothing is releasable)"
-    deps: [tools:semrel-plugins]
     silent: true
     cmds:
       - |
@@ -262,41 +261,28 @@ tasks:
           | sed -n '/^{/,/^}/p' \
           | jq -r 'select(.released == true) | .next_version // empty'
 
-  release:pin-action:
-    desc: "Pin the GitHub Action's default CLI version to the version about to be released and commit it"
-    cmds:
-      - |
-        set -euo pipefail
-        next="$(task release:next-version)"
-        if [[ -z "$next" ]]; then
-          echo "Nothing to release; leaving action.yaml untouched"
-          exit 0
-        fi
-        version="${next#v}"
-        perl -pi -e 's/^(\s*default:\s*")[0-9]+\.[0-9]+\.[0-9]+(".*# pinned-cli-version)/${1}'"$version"'${2}/' action.yaml
-        if git diff --quiet -- action.yaml; then
-          echo "action.yaml already pins $version"
-          exit 0
-        fi
-        git add action.yaml
-        git commit -m "build(action): pin CLI to ${next}"
-        echo "Pinned action.yaml to $version"
-
+  # Release runs never modify the repository: no generated commits, no file
+  # rewrites. semrel only creates the tag and the GitHub release from the
+  # commits that are already on the branch.
   release:gh:
-    desc: "Create the tag and GitHub release with semrel (pins the action version first)"
+    desc: "Create the tag and GitHub release with semrel"
     deps: [tools:semrel-plugins]
     cmds:
       - |
         set -euo pipefail
         branch="$(git branch --show-current)"
-        if [[ -z "${CI:-}" ]]; then
-          git pull --rebase origin "$branch"
+        if [[ -n "$(git status --porcelain)" ]]; then
+          echo "Working tree is not clean; commit or stash before releasing" >&2
+          exit 1
+        fi
+        git fetch origin "$branch" --quiet
+        if [[ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$branch")" ]]; then
+          echo "Local $branch differs from origin/$branch; pull or push first so the release tags a commit that is on the remote" >&2
+          exit 1
         fi
         if [[ -z "${SEMREL_PLUGIN_TOKEN:-}" ]]; then
           export SEMREL_PLUGIN_TOKEN="${GITHUB_TOKEN:-$(gh auth token)}"
         fi
-        task release:pin-action
-        git push origin "$branch"
         semrel release --output-file .semrel-release.json
 
   release:artifacts:

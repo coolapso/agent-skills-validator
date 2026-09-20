@@ -11,9 +11,9 @@ inputs:
     required: false
     default: "."
   version:
-    description: "agent-skills-validator release to download (e.g. 1.2.3). Defaults to the CLI version pinned by this action release; 'latest' resolves the newest release."
+    description: "agent-skills-validator release to download, e.g. 1.2.3, v1 (newest 1.x) or latest. Empty (default) follows the action ref: an exact tag uses that release, a major tag such as v1 uses the newest release of that line, anything else uses the latest release."
     required: false
-    default: "0.1.0" # pinned-cli-version (updated automatically by `task release`)
+    default: ""
   strict:
     description: "Treat specification recommendations as errors (passes --strict)"
     required: false
@@ -45,11 +45,23 @@ runs:
       id: install
       shell: bash
       env:
-        VERSION: ${{ inputs.version }}
+        INPUT_VERSION: ${{ inputs.version }}
+        ACTION_REF: ${{ github.action_ref }}
         INSTALL_DIR: ${{ runner.temp }}/agent-skills-validator
         GH_TOKEN: ${{ github.token }}
       run: |
-        bash "${GITHUB_ACTION_PATH}/site/install.sh"
+        # The action and the CLI are released together, so the action ref is
+        # the CLI version unless the caller overrides it.
+        version="$INPUT_VERSION"
+        if [[ -z "$version" ]]; then
+          if [[ "$ACTION_REF" =~ ^v?[0-9]+(\.[0-9]+){0,2}$ ]]; then
+            version="$ACTION_REF"
+          else
+            version="latest"
+          fi
+        fi
+        echo "Resolved CLI version request: ${version} (action ref: ${ACTION_REF:-none})"
+        VERSION="$version" bash "${GITHUB_ACTION_PATH}/site/install.sh"
         suffix=""
         [[ "$RUNNER_OS" == "Windows" ]] && suffix=".exe"
         echo "bin=${INSTALL_DIR}/agent-skills-validator${suffix}" >> "$GITHUB_OUTPUT"

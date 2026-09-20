@@ -7,7 +7,8 @@
 # Also used by action.yaml, which sets INSTALL_DIR to a writable temp directory.
 #
 # Environment:
-#   VERSION      release tag to install (default: latest)
+#   VERSION      release to install: exact tag (v1.2.3), a line (v1 or v1.2 = newest
+#                release in that line), or latest (default)
 #   INSTALL_DIR  destination directory (default: /usr/local/bin)
 #   GH_TOKEN     optional token used when resolving the latest release via the GitHub API
 #   BASE_URL     override the release download URL (testing only)
@@ -42,16 +43,31 @@ case "$OS" in
     ;;
 esac
 
-if [[ -n "${VERSION:-}" && "$VERSION" != "latest" ]]; then
-  TAG="$VERSION"
-else
-  AUTH=()
-  if [[ -n "${GH_TOKEN:-}" ]]; then
-    AUTH=(-H "Authorization: Bearer ${GH_TOKEN}")
+AUTH=()
+if [[ -n "${GH_TOKEN:-}" ]]; then
+  AUTH=(-H "Authorization: Bearer ${GH_TOKEN}")
+fi
+
+# tag_names prints the tag of every release, newest first.
+tag_names() {
+  curl -fsSL "${AUTH[@]}" -H "Accept: application/vnd.github+json" "$1" \
+    | sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p'
+}
+
+REQUESTED="${VERSION:-latest}"
+if [[ "$REQUESTED" == "latest" ]]; then
+  TAG="$(tag_names "https://api.github.com/repos/${REPO}/releases/latest" | head -n1)"
+elif [[ "$REQUESTED" =~ ^v?[0-9]+(\.[0-9]+)?$ ]]; then
+  # A line such as v1 or v1.2: newest non-prerelease tag in that line.
+  LINE="v${REQUESTED#v}."
+  TAG="$(tag_names "https://api.github.com/repos/${REPO}/releases?per_page=100" \
+    | grep -F "$LINE" | grep -E "^${LINE//./\\.}[0-9]+(\.[0-9]+)?$" | head -n1)"
+  if [[ -z "$TAG" ]]; then
+    echo "No release found in the ${REQUESTED} line." >&2
+    exit 1
   fi
-  TAG="$(curl -fsSL "${AUTH[@]}" -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/repos/${REPO}/releases/latest" \
-    | sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
+else
+  TAG="$REQUESTED"
 fi
 
 if [[ -z "$TAG" ]]; then

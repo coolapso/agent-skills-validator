@@ -82,9 +82,14 @@ external URLs or reference-link existence, and it never touches the network.
   `checksums.txt`. Changing archive or checksum names in `.goreleaser.yaml` requires changing
   `site/install.sh` too. The script must keep working under `shell: bash` on Windows runners
   (Git Bash): no `install`, `unzip` may be missing (7z and PowerShell fallbacks exist).
-- **The action's default `version` is pinned.** The line in `action.yaml` ending in
-  `# pinned-cli-version` is rewritten by `task release:pin-action` before semrel tags. Keep that
-  marker comment intact.
+- **Release runs never mutate the repository.** No generated commits, no file rewrites, no
+  changelog. semrel tags the commit that is already on the remote and creates the GitHub release;
+  GoReleaser and the container push only publish artifacts. `release:gh` refuses to run on a
+  dirty tree or when local and remote branches differ.
+- **The action follows its own ref for the CLI version.** With `version` empty, the install step
+  uses `github.action_ref`: an exact tag runs that CLI release, a major tag like `v1` runs the
+  newest `v1.x` release (resolved by `site/install.sh` through the releases API), anything else
+  runs `latest`. Action and CLI are released together, so the refs line up.
 
 ## Adding or changing a rule
 
@@ -140,8 +145,8 @@ and optionally `discord_webhook_id` / `discord_webhook_token`.
 Releases are Conventional-Commit driven and runnable from a laptop or CI with the same tasks:
 
 - `task release:dry-run` shows the next version.
-- `task release` runs `check`, then `release:gh` (pins `action.yaml`, pushes, `semrel release`
-  creates the tag and GitHub release; `commit_changelog: false`, release notes are the changelog), then `release:artifacts`
+- `task release` runs `check`, then `release:gh` (`semrel release` creates the tag and GitHub
+  release; `commit_changelog: false`, release notes are the changelog), then `release:artifacts`
   (`goreleaser release --clean` attaches binaries, checksums, deb/rpm and AUR), then
   `release:major-tag` moves `v1` to the new tag, then `container:push` publishes the multi-arch
   image (`docker buildx`, needs QEMU for arm64 locally).
