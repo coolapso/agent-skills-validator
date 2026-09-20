@@ -141,12 +141,17 @@ Releases are Conventional-Commit driven and runnable from a laptop or CI with th
 
 - `task release:dry-run` shows the next version.
 - `task release` runs `check`, then `release:gh` (pins `action.yaml`, pushes, `semrel release`
-  creates the changelog commit, tag and GitHub release), then `release:artifacts`
+  creates the tag and GitHub release; `commit_changelog: false`, release notes are the changelog), then `release:artifacts`
   (`goreleaser release --clean` attaches binaries, checksums, deb/rpm and AUR), then
   `release:major-tag` moves `v1` to the new tag, then `container:push` publishes the multi-arch
   image (`docker buildx`, needs QEMU for arm64 locally).
 - Commit types that release: `feat` (minor), `fix`/`ref`/`build` (patch). Use `chore`, `docs`,
   `test`, `ci` for changes that must not release.
+- `.semrel.lock` pins `@semrel/provider-github`; it must be a version compatible with the pinned
+  semrel core (0.5.3 with semrel v0.26.2, the same lock as convcommitlint and the terraform
+  modules). An older plugin fails with "This binary is a plugin. These are not meant to be
+  executed directly." Update the lock by copying it from a working repo or with
+  `semrel plugin update`.
 
 ## Mandatory checks before you finish
 

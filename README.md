@@ -274,7 +274,9 @@ Every rule has fixtures under `internal/validator/testdata`. Add a fixture and a
 ### Releasing
 
 Releases follow [Conventional Commits](https://www.conventionalcommits.org) and can be run
-entirely from a local machine or from the `Release` workflow; both call the same tasks.
+entirely from a local machine or from the `Release` workflow; both call the same tasks. A local
+release needs `go`, `task`, `gh` (logged in), `jq`, `perl`, `docker` with buildx (plus QEMU for
+arm64), the `infisical` CLI (logged in), and the pinned tools from `task tools:install`.
 
 ```sh
 task release:dry-run   # preview the next version and notes
@@ -282,7 +284,8 @@ task release           # checks, semrel tag + GitHub release, GoReleaser artifac
 ```
 
 [semrel](https://semrel.io) computes the version, pins the action's default CLI version in
-`action.yaml`, commits the changelog, tags and creates the GitHub release.
+`action.yaml`, tags and creates the GitHub release with generated notes (no changelog file is
+committed).
 [GoReleaser](https://goreleaser.com) then builds the binaries, archives, checksums, `.deb`/`.rpm`
 packages and the AUR package and attaches them to that release. Finally the multi-arch container
 image is pushed to the GitHub Container Registry and Docker Hub. A token is taken from

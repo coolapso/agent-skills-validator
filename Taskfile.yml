@@ -37,11 +37,9 @@ tasks:
       - task: tools:semrel-plugins
 
   tools:semrel-plugins:
-    desc: "Install the semrel plugins pinned in .semrel.lock into .semrel/plugins"
+    desc: "Install the semrel plugins pinned in .semrel.lock into .semrel/plugins (idempotent, always runs so a stale plugin version never lingers)"
     cmds:
       - semrel plugin restore
-    status:
-      - test -d .semrel/plugins
 
   # ---------------------------------------------------------------- secrets
 
@@ -224,9 +222,10 @@ tasks:
       - goreleaser release --snapshot --clean --skip=publish,announce,aur
 
   release:dry-run:
-    desc: "Show the next version and release notes semrel would create"
+    desc: "Check the semrel setup and show the next version and release notes it would create"
     deps: [tools:semrel-plugins]
     cmds:
+      - semrel doctor
       - semrel release --dry-run
 
   release:next-version:

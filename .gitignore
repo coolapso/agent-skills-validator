@@ -5,7 +5,8 @@
 /coverage.out
 
 # semrel plugin binaries (restored from .semrel.lock with `semrel plugin restore`)
-/.semrel/
+.semrel/*/
+.semrel-analytics.jsonl
 
 # Release metadata written by semrel
 /.semrel-release.json
