@@ -222,19 +222,20 @@ curl -fsSL https://agent-skills-validator.coolapso.sh/install.sh | VERSION=v1.0.
                     <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
                         <h3 class="font-bold text-lg mb-3 dark:text-white">Docker</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Multi-arch images for <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">linux/amd64</code>
-                            and <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">linux/arm64</code> on the GitHub Container Registry, built from
+                            and <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">linux/arm64</code> on the GitHub Container Registry and Docker Hub, built from
                             <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">scratch</code> and running as a non-root user. Mount your repository on
                             <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">/data</code> and pass skill paths relative to it.</p>
                         <div class="relative bg-gray-900 dark:bg-black rounded-lg">
                             <pre class="text-gray-100 text-sm p-4 pr-20 overflow-x-auto"><code>docker run --rm -v "$PWD:/data:ro" ghcr.io/coolapso/agent-skills-validator:latest validate skills/my-skill
 
-# pin a version, machine-readable output
-docker run --rm -v "$PWD:/data:ro" ghcr.io/coolapso/agent-skills-validator:1.0.0 validate --format json skills/*/</code></pre>
+# Docker Hub, pinned version, machine-readable output
+docker run --rm -v "$PWD:/data:ro" coolapso/agent-skills-validator:1.0.0 validate --format json skills/*/</code></pre>
                             <button type="button" data-copy
                                 class="absolute top-2 right-2 text-xs font-semibold bg-gray-700 hover:bg-gray-600 text-white px-2.5 py-1 rounded-md">Copy</button>
                         </div>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">
-                            <a class="underline" href="https://github.com/coolapso/agent-skills-validator/pkgs/container/agent-skills-validator">Browse the published tags</a>.</p>
+                            <a class="underline" href="https://github.com/coolapso/agent-skills-validator/pkgs/container/agent-skills-validator">GHCR tags</a> ·
+                            <a class="underline" href="https://hub.docker.com/r/coolapso/agent-skills-validator">Docker Hub</a>.</p>
                     </div>
                     <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
                         <h3 class="font-bold text-lg mb-3 dark:text-white">Go</h3>

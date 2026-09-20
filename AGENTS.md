@@ -41,8 +41,8 @@ external URLs or reference-link existence, and it never touches the network.
   reload; never substitute another dev server.
 - `Dockerfile` + `.dockerignore` — multi-stage image: Go builder cross-compiling for
   `TARGETOS`/`TARGETARCH`, `scratch` runtime, non-root user, `WORKDIR /data` for bind mounts.
-  Built and pushed by the `container:*` tasks to `ghcr.io/coolapso/agent-skills-validator`,
-  tagged `latest` and the release version. GHCR only; no Docker Hub.
+  Built and pushed by the `container:*` tasks to `ghcr.io/coolapso/agent-skills-validator` and
+  Docker Hub `coolapso/agent-skills-validator`, tagged `latest` and the release version.
 - `Taskfile.yml` — every build, test and release command. CI calls these tasks; do not duplicate
   logic in workflows.
 - `.semrel.yaml`, `.semrel.lock`, `.goreleaser.yaml` — release tooling configuration.
@@ -117,6 +117,19 @@ These are deliberate and must not be "fixed":
   semantics for file references, and keep it disabled by default.
 - **Multiple paths in the action's `path` input** (newline-delimited). Add only if users ask; the
   CLI already accepts many directories, so a matrix or a plain `run:` step covers it today.
+
+## Secrets
+
+No GitHub repository secrets are used. Credentials live in the Infisical project `cicd`
+(EU cloud, environment `ci`): `ghcr`, `dockerhub`, `aur`, `cloudflare_api_token`, `cloudflare_account_id`,
+and optionally `discord_webhook_id` / `discord_webhook_token`.
+
+- Locally, tasks fall back to `task secrets:get -- <key>` (the `infisical` CLI, user login) when
+  the matching environment variable is unset; GHCR falls back further to the `gh` token.
+- In CI, `Infisical/secrets-action` authenticates with GitHub OIDC (job needs `id-token: write`)
+  and exports each key as an environment variable with the same lowercase name, e.g.
+  `${{ env.aur }}`. The machine identity must allow this repository in its OIDC subject binding.
+- Never print secret values in task output or logs. Listing key names is fine.
 
 ## Release process
 

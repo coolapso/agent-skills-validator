@@ -11,6 +11,7 @@ on:
 permissions:
   contents: read
   deployments: write
+  id-token: write # Infisical OIDC auth
 
 concurrency:
   group: "pages"
@@ -22,10 +23,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Fetch secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          domain: "https://eu.infisical.com"
+          method: "oidc"
+          env-slug: "ci"
+          project-slug: "cicd"
+          identity-id: "4d6a4fd3-8b48-4eab-86a9-37d87de683e0"
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ env.cloudflare_api_token }}
+          accountId: ${{ env.cloudflare_account_id }}
           command: pages deploy site --project-name=agent-skills-validator
           githubToken: ${{ secrets.GITHUB_TOKEN }}

@@ -2,7 +2,7 @@
 
 [![Release](https://github.com/coolapso/agent-skills-validator/actions/workflows/release.yaml/badge.svg?branch=main)](https://github.com/coolapso/agent-skills-validator/actions/workflows/release.yaml)
 ![GitHub Tag](https://img.shields.io/github/v/tag/coolapso/agent-skills-validator?logo=semver&label=semver&labelColor=gray&color=green)
-[![Container image](https://img.shields.io/badge/ghcr.io-coolapso%2Fagent--skills--validator-blue?logo=docker)](https://github.com/coolapso/agent-skills-validator/pkgs/container/agent-skills-validator)
+[![Docker image version](https://img.shields.io/docker/v/coolapso/agent-skills-validator/latest?logo=docker)](https://hub.docker.com/r/coolapso/agent-skills-validator)
 [![Go Report Card](https://goreportcard.com/badge/github.com/coolapso/agent-skills-validator)](https://goreportcard.com/report/github.com/coolapso/agent-skills-validator)
 ![GitHub Sponsors](https://img.shields.io/github/sponsors/coolapso?style=flat&logo=githubsponsors)
 
@@ -189,15 +189,16 @@ Consume the JSON report:
 
 ### Docker
 
-Images for `linux/amd64` and `linux/arm64` are published to the GitHub Container Registry.
-Mount the directory holding your skills on `/data` (the image's working directory) and pass the
-skill paths relative to it:
+Images for `linux/amd64` and `linux/arm64` are published to the GitHub Container Registry and
+Docker Hub. Mount the directory holding your skills on `/data` (the image's working directory)
+and pass the skill paths relative to it:
 
 ```sh
+# GitHub Container Registry
 docker run --rm -v "$PWD:/data:ro" ghcr.io/coolapso/agent-skills-validator:latest validate skills/pdf-processing
 
-# pin a version, machine-readable output
-docker run --rm -v "$PWD:/data:ro" ghcr.io/coolapso/agent-skills-validator:1.0.0 validate --format json skills/*/
+# Docker Hub, pinned version, machine-readable output
+docker run --rm -v "$PWD:/data:ro" coolapso/agent-skills-validator:1.0.0 validate --format json skills/*/
 ```
 
 The image is built from `scratch`, runs as a non-root user, and contains only the static binary.
@@ -284,8 +285,11 @@ task release           # checks, semrel tag + GitHub release, GoReleaser artifac
 `action.yaml`, commits the changelog, tags and creates the GitHub release.
 [GoReleaser](https://goreleaser.com) then builds the binaries, archives, checksums, `.deb`/`.rpm`
 packages and the AUR package and attaches them to that release. Finally the multi-arch container
-image is pushed to the GitHub Container Registry. A token is taken from `GITHUB_TOKEN` or
-`gh auth token`; `AUR_KEY` and the Discord webhook variables are optional.
+image is pushed to the GitHub Container Registry and Docker Hub. A token is taken from
+`GITHUB_TOKEN` or `gh auth token`. Publisher credentials (`DOCKERHUB_TOKEN`, `AUR_KEY`, Discord webhook) and the Cloudflare
+token for the site are read from [Infisical](https://infisical.com) when not set in the
+environment: locally through the `infisical` CLI, in CI through `Infisical/secrets-action` with
+OIDC, so the GitHub repository holds no secrets.
 
 ### Specification revision
 

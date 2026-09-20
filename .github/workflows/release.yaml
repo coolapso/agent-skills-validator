@@ -21,6 +21,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write # Infisical OIDC auth
     steps:
       - uses: actions/checkout@v5
         with:
@@ -45,6 +46,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Fetch secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          domain: "https://eu.infisical.com"
+          method: "oidc"
+          env-slug: "ci"
+          project-slug: "cicd"
+          identity-id: "4d6a4fd3-8b48-4eab-86a9-37d87de683e0"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -54,17 +64,28 @@ jobs:
       # The Taskfile is the single release path: semrel pins the action's CLI
       # version, tags, and creates the GitHub release; GoReleaser then attaches
       # the artifacts, the floating major tag is moved, and the multi-arch
-      # container images are pushed to GHCR.
+      # container images are pushed to GHCR and Docker Hub.
       - name: Release
         run: task release:ci
         env:
           CI: "true"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SEMREL_PLUGIN_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Everything below comes from Infisical (project cicd, env ci); no
+          # repository secrets are configured. The built-in GITHUB_TOKEN is
+          # enough for GHCR.
           GHCR_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-          AUR_KEY: ${{ secrets.AUR_KEY }}
-          DISCORD_WEBHOOK_ID: ${{ secrets.DISCORD_WEBHOOK_ID }}
-          DISCORD_WEBHOOK_TOKEN: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
+          DOCKERHUB_TOKEN: ${{ env.dockerhub }}
+          AUR_KEY: ${{ env.aur }}
+          DISCORD_WEBHOOK_ID: ${{ env.discord_webhook_id }}
+          DISCORD_WEBHOOK_TOKEN: ${{ env.discord_webhook_token }}
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: coolapso
+          password: ${{ env.dockerhub }}
+          repository: coolapso/agent-skills-validator
 
   action-integration:
     needs: release

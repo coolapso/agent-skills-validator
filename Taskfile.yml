@@ -4,7 +4,12 @@ vars:
   NAME: "agent-skills-validator"
   REPOSITORY: "github.com/coolapso/agent-skills-validator"
   CONTAINER_REGISTRY: "ghcr.io/coolapso"
+  DOCKERHUB_REPOSITORY: "coolapso/agent-skills-validator"
+  DOCKERHUB_USERNAME: "coolapso"
   CF_PAGES_PROJECT: "agent-skills-validator"
+  INFISICAL_DOMAIN: "https://eu.infisical.com"
+  INFISICAL_PROJECT_ID: "7897aa98-f8e5-40f2-a83d-f4926cdba05b"
+  INFISICAL_ENV: "ci"
   CONTAINER_PLATFORMS: "linux/amd64,linux/arm64"
   MODULE: "github.com/coolapso/agent-skills-validator"
   SEMREL_VERSION: "v0.26.2"
@@ -37,6 +42,18 @@ tasks:
       - semrel plugin restore
     status:
       - test -d .semrel/plugins
+
+  # ---------------------------------------------------------------- secrets
+
+  # Local runs read release credentials from Infisical (project cicd, env ci)
+  # when the corresponding environment variable is not already set. CI gets
+  # the same secrets through Infisical/secrets-action with OIDC, so nothing
+  # is stored in GitHub repository secrets.
+  secrets:get:
+    desc: "Print one secret from Infisical, e.g. task secrets:get -- aur"
+    silent: true
+    cmds:
+      - infisical secrets get --plain --silent --domain={{.INFISICAL_DOMAIN}} --projectId {{.INFISICAL_PROJECT_ID}} --env {{.INFISICAL_ENV}} {{.CLI_ARGS}}
 
   # ---------------------------------------------------------------- develop
 
@@ -162,17 +179,29 @@ tasks:
       - docker run --rm -v "$PWD/{{.FIXTURES}}:/data:ro" {{.NAME}}:latest validate invalid/as004-mismatch && exit 1 || test $? -eq 1
 
   container:login:
-    desc: "Log in to GHCR (GHCR_PASSWORD, GITHUB_TOKEN, or the gh CLI token)"
+    desc: "Log in to GHCR and Docker Hub (credentials from the environment, else Infisical, else the gh CLI token for GHCR)"
     cmds:
       - |
         set -euo pipefail
+        if [[ -z "${GHCR_PASSWORD:-}" ]]; then
+          GHCR_PASSWORD="$(task secrets:get -- ghcr 2>/dev/null || true)"
+        fi
         if [[ -z "${GHCR_PASSWORD:-}" ]]; then
           GHCR_PASSWORD="${GITHUB_TOKEN:-$(gh auth token)}"
         fi
         echo "$GHCR_PASSWORD" | docker login ghcr.io -u coolapso --password-stdin
 
+        if [[ -z "${DOCKERHUB_TOKEN:-}" ]]; then
+          DOCKERHUB_TOKEN="$(task secrets:get -- dockerhub 2>/dev/null || true)"
+        fi
+        if [[ -z "${DOCKERHUB_TOKEN:-}" ]]; then
+          echo "DOCKERHUB_TOKEN not set and not found in Infisical" >&2
+          exit 1
+        fi
+        echo "$DOCKERHUB_TOKEN" | docker login -u {{.DOCKERHUB_USERNAME}} --password-stdin
+
   container:push:
-    desc: "Build and push multi-arch images tagged latest and with the current release version to GHCR"
+    desc: "Build and push multi-arch images tagged latest and with the current release version to GHCR and Docker Hub"
     deps: [container:login]
     cmds:
       - |
@@ -183,7 +212,9 @@ tasks:
         docker buildx build --push --platform {{.CONTAINER_PLATFORMS}} \
           --build-arg VERSION="${tag}" \
           -t "{{.CONTAINER_REGISTRY}}/{{.NAME}}:latest" \
-          -t "{{.CONTAINER_REGISTRY}}/{{.NAME}}:${tag}" .
+          -t "{{.CONTAINER_REGISTRY}}/{{.NAME}}:${tag}" \
+          -t "{{.DOCKERHUB_REPOSITORY}}:latest" \
+          -t "{{.DOCKERHUB_REPOSITORY}}:${tag}" .
 
   # ---------------------------------------------------------------- release
 
@@ -253,6 +284,13 @@ tasks:
         if [[ -z "${GITHUB_TOKEN:-}" ]]; then
           export GITHUB_TOKEN="$(gh auth token)"
         fi
+        # Optional publishers: pulled from Infisical when not set; GoReleaser
+        # skips AUR and Discord when these stay empty.
+        export AUR_KEY="${AUR_KEY:-$(task secrets:get -- aur 2>/dev/null || true)}"
+        export DISCORD_WEBHOOK_ID="${DISCORD_WEBHOOK_ID:-$(task secrets:get -- discord_webhook_id 2>/dev/null || true)}"
+        export DISCORD_WEBHOOK_TOKEN="${DISCORD_WEBHOOK_TOKEN:-$(task secrets:get -- discord_webhook_token 2>/dev/null || true)}"
+        [[ -z "$AUR_KEY" ]] && unset AUR_KEY
+        [[ -z "$DISCORD_WEBHOOK_ID" ]] && unset DISCORD_WEBHOOK_ID DISCORD_WEBHOOK_TOKEN
         goreleaser release --clean
 
   release:major-tag:
