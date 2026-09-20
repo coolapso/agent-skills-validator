@@ -128,7 +128,11 @@ and optionally `discord_webhook_id` / `discord_webhook_token`.
   the matching environment variable is unset; GHCR falls back further to the `gh` token.
 - In CI, `Infisical/secrets-action` authenticates with GitHub OIDC (job needs `id-token: write`)
   and exports each key as an environment variable with the same lowercase name, e.g.
-  `${{ env.aur }}`. The machine identity must allow this repository in its OIDC subject binding.
+  `${{ env.aur }}`. The machine identity's OIDC subject must match this repository's token. This
+  repo uses GitHub's immutable subject format with numeric IDs:
+  `repo:coolapso@14358086/agent-skills-validator@1378153445:ref:refs/heads/main`. Glob `*` does
+  not cross `/`, so the binding needs a trailing `**`. Fetch the prefix with
+  `gh api repos/coolapso/agent-skills-validator/actions/oidc/customization/sub`.
 - Never print secret values in task output or logs. Listing key names is fine.
 
 ## Release process
