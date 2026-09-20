@@ -43,17 +43,23 @@ func Validate(target string, opts Options) (Result, error) {
 
 	skillFile := filepath.Join(target, "SKILL.md")
 	skillPath := displayPath(skillFile)
-	content, err := os.ReadFile(skillFile)
+	// Stat before reading: the error for reading a directory differs between
+	// operating systems ("is a directory" on Unix, "Incorrect function" on
+	// Windows), so the type check must not rely on it.
+	fileInfo, err := os.Stat(skillFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			res.add(RuleSkillDirectory, SeverityError, res.Path, 0, "directory does not contain a SKILL.md file")
 			return finish(res, opts), nil
 		}
-		var pathErr *os.PathError
-		if errors.As(err, &pathErr) && pathErr.Err.Error() == "is a directory" {
-			res.add(RuleSkillDirectory, SeverityError, skillPath, 0, "SKILL.md must be a file, but it is a directory")
-			return finish(res, opts), nil
-		}
+		return res, &InputError{Path: skillFile, Err: err}
+	}
+	if fileInfo.IsDir() {
+		res.add(RuleSkillDirectory, SeverityError, skillPath, 0, "SKILL.md must be a file, but it is a directory")
+		return finish(res, opts), nil
+	}
+	content, err := os.ReadFile(skillFile)
+	if err != nil {
 		return res, &InputError{Path: skillFile, Err: err}
 	}
 
