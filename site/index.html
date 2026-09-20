@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>agent-skills-validator - Validate Agent Skills against the specification</title>
+    <meta name="description"
+        content="An independent Go CLI and GitHub Action that validate SKILL.md files against the public Agent Skills specification. Stable rule IDs, JSON output, zero network access.">
+    <link rel="icon"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='4'/%3E%3Cpath d='m8 12 3 3 5-6'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        pre,
+        code {
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        }
+
+        .diag-error {
+            color: #f87171;
+        }
+
+        .diag-warning {
+            color: #fbbf24;
+        }
+
+        .diag-ok {
+            color: #4ade80;
+        }
+    </style>
+    <script>
+        // Inline in head to avoid a flash of the wrong theme.
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
+
+    <header
+        class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-50 border-b border-transparent dark:border-gray-700 transition-colors duration-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <a href="#" class="flex items-center gap-3">
+                <svg class="h-9 w-9 text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="4" />
+                    <path d="m8 12 3 3 5-6" />
+                </svg>
+                <span class="font-bold text-xl tracking-tight text-indigo-600 dark:text-indigo-400">agent-skills-validator</span>
+            </a>
+            <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600 dark:text-gray-300">
+                <a href="#install" class="hover:text-indigo-600 dark:hover:text-indigo-400">Install</a>
+                <a href="#usage" class="hover:text-indigo-600 dark:hover:text-indigo-400">Usage</a>
+                <a href="#rules" class="hover:text-indigo-600 dark:hover:text-indigo-400">Rules</a>
+                <a href="#action" class="hover:text-indigo-600 dark:hover:text-indigo-400">GitHub Action</a>
+            </nav>
+            <div class="flex items-center gap-4">
+                <button id="theme-toggle" type="button" aria-label="Toggle dark mode"
+                    class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5 transition-colors">
+                    <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
+                    </svg>
+                    <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                            d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
+                            fill-rule="evenodd" clip-rule="evenodd"></path>
+                    </svg>
+                </button>
+                <a href="https://github.com/coolapso/agent-skills-validator"
+                    class="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-2 font-medium">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd"
+                            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                            clip-rule="evenodd"></path>
+                    </svg>
+                    <span class="hidden sm:inline">GitHub</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero -->
+        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28 flex flex-col items-center text-center">
+            <span
+                class="inline-flex items-center gap-2 rounded-full bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-4 py-1 text-sm font-semibold mb-6">
+                Implements the public Agent Skills specification
+            </span>
+            <h1 class="text-4xl md:text-6xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-6">
+                Validate your <span class="text-indigo-600 dark:text-indigo-400">SKILL.md</span> before an agent does
+            </h1>
+            <p class="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mb-10 leading-relaxed">
+                An independent Go CLI and GitHub Action that check skill directories against the
+                <a href="https://agentskills.io/specification"
+                    class="text-indigo-600 dark:text-indigo-400 underline underline-offset-2">Agent Skills specification</a>.
+                Stable rule IDs, line-accurate diagnostics, JSON for CI, and no network access.
+            </p>
+            <div class="w-full max-w-2xl mb-8">
+                <div class="relative bg-gray-900 dark:bg-black rounded-xl shadow-lg text-left">
+                    <pre class="text-gray-100 text-sm sm:text-base p-5 pr-24 whitespace-pre-wrap break-all"><code>curl -fsSL https://coolapso.github.io/agent-skills-validator/install.sh | bash</code></pre>
+                    <button type="button" data-copy
+                        class="absolute top-3 right-3 text-xs font-semibold bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-md transition-colors">Copy</button>
+                </div>
+            </div>
+            <div class="flex flex-wrap justify-center gap-4">
+                <a href="https://github.com/coolapso/agent-skills-validator"
+                    class="bg-indigo-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-colors shadow-lg hover:shadow-xl">
+                    View on GitHub
+                </a>
+                <a href="#action"
+                    class="bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
+                    Use the Action
+                </a>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section
+            class="bg-white dark:bg-gray-800 py-20 border-t border-gray-100 dark:border-gray-700 transition-colors duration-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-3xl font-bold text-center mb-16 dark:text-white">Why use agent-skills-validator?</h2>
+                <div class="grid md:grid-cols-3 gap-10">
+                    <div class="bg-gray-50 dark:bg-gray-700 p-8 rounded-2xl border border-gray-100 dark:border-gray-600">
+                        <div
+                            class="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-xl flex items-center justify-center mb-6 text-2xl">
+                            📐</div>
+                        <h3 class="text-xl font-bold mb-3 dark:text-white">Specification only</h3>
+                        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">Every rule maps 1:1 to the public
+                            specification. No Markdown opinions, no host-specific fields, no repository conventions.
+                            Unknown keys and extra files are allowed, exactly as the spec says.</p>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 p-8 rounded-2xl border border-gray-100 dark:border-gray-600">
+                        <div
+                            class="w-12 h-12 bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 rounded-xl flex items-center justify-center mb-6 text-2xl">
+                            🎯</div>
+                        <h3 class="text-xl font-bold mb-3 dark:text-white">Actionable diagnostics</h3>
+                        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">Each finding has a stable rule ID
+                            (<code class="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-sm">AS001</code>–<code
+                                class="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-sm">AS010</code>), a
+                            severity, the file, the line, and a message that tells you what to change.</p>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 p-8 rounded-2xl border border-gray-100 dark:border-gray-600">
+                        <div
+                            class="w-12 h-12 bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-300 rounded-xl flex items-center justify-center mb-6 text-2xl">
+                            🧾</div>
+                        <h3 class="text-xl font-bold mb-3 dark:text-white">Types preserved</h3>
+                        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">Frontmatter is decoded with a real
+                            YAML parser, so <code class="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-sm">version: 1.0</code>
+                            is caught as a float while <code class="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-sm">"1.0"</code>
+                            passes. Lengths count Unicode code points, not bytes.</p>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 p-8 rounded-2xl border border-gray-100 dark:border-gray-600">
+                        <div
+                            class="w-12 h-12 bg-sky-100 dark:bg-sky-900 text-sky-600 dark:text-sky-300 rounded-xl flex items-center justify-center mb-6 text-2xl">
+                            🤖</div>
+                        <h3 class="text-xl font-bold mb-3 dark:text-white">Built for CI</h3>
+                        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">Stable JSON output, documented exit
+                            codes, <code class="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-sm">--strict</code> and
+                            <code class="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-sm">--fail-on-warnings</code>
+                            flags, and a composite GitHub Action that needs no Go, Python or Node on the runner.</p>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 p-8 rounded-2xl border border-gray-100 dark:border-gray-600">
+                        <div
+                            class="w-12 h-12 bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-300 rounded-xl flex items-center justify-center mb-6 text-2xl">
+                            🔒</div>
+                        <h3 class="text-xl font-bold mb-3 dark:text-white">Offline and verified</h3>
+                        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">Validation never touches the network.
+                            Release binaries ship with SHA-256 checksums that the install script and the Action verify
+                            before running anything.</p>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-700 p-8 rounded-2xl border border-gray-100 dark:border-gray-600">
+                        <div
+                            class="w-12 h-12 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 rounded-xl flex items-center justify-center mb-6 text-2xl">
+                            💻</div>
+                        <h3 class="text-xl font-bold mb-3 dark:text-white">Cross-platform</h3>
+                        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">Single static binary for Linux, macOS
+                            and Windows on amd64 and arm64, plus a multi-arch container image. LF and CRLF files, UTF-8 BOMs and malformed UTF-8 are all
+                            handled and reported clearly.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Install -->
+        <section id="install" class="py-20">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-3xl font-bold text-center mb-4 dark:text-white">Installation</h2>
+                <p class="text-center text-gray-600 dark:text-gray-300 mb-12">Pick whichever fits your machine. All
+                    options install the same static binary.</p>
+                <div class="flex flex-col gap-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">Install script (Linux, macOS)</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Downloads the latest release, verifies the
+                            checksum and installs to <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">/usr/local/bin</code>.
+                            Set <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">VERSION</code> or
+                            <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">INSTALL_DIR</code> to override.</p>
+                        <div class="relative bg-gray-900 dark:bg-black rounded-lg">
+                            <pre class="text-gray-100 text-sm p-4 pr-20 overflow-x-auto"><code>curl -fsSL https://coolapso.github.io/agent-skills-validator/install.sh | bash
+
+# a specific version
+curl -fsSL https://coolapso.github.io/agent-skills-validator/install.sh | VERSION=v1.0.0 bash</code></pre>
+                            <button type="button" data-copy
+                                class="absolute top-2 right-2 text-xs font-semibold bg-gray-700 hover:bg-gray-600 text-white px-2.5 py-1 rounded-md">Copy</button>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">Remove it later with
+                            <a class="underline" href="uninstall.sh">uninstall.sh</a>.</p>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">Docker</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Multi-arch images for <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">linux/amd64</code>
+                            and <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">linux/arm64</code> on the GitHub Container Registry, built from
+                            <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">scratch</code> and running as a non-root user. Mount your repository on
+                            <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">/data</code> and pass skill paths relative to it.</p>
+                        <div class="relative bg-gray-900 dark:bg-black rounded-lg">
+                            <pre class="text-gray-100 text-sm p-4 pr-20 overflow-x-auto"><code>docker run --rm -v "$PWD:/data:ro" ghcr.io/coolapso/agent-skills-validator:latest validate skills/my-skill
+
+# pin a version, machine-readable output
+docker run --rm -v "$PWD:/data:ro" ghcr.io/coolapso/agent-skills-validator:1.0.0 validate --format json skills/*/</code></pre>
+                            <button type="button" data-copy
+                                class="absolute top-2 right-2 text-xs font-semibold bg-gray-700 hover:bg-gray-600 text-white px-2.5 py-1 rounded-md">Copy</button>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                            <a class="underline" href="https://github.com/coolapso/agent-skills-validator/pkgs/container/agent-skills-validator">Browse the published tags</a>.</p>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">Go</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Build and install from source with the Go toolchain.</p>
+                        <div class="relative bg-gray-900 dark:bg-black rounded-lg">
+                            <pre class="text-gray-100 text-sm p-4 pr-20 overflow-x-auto"><code>go install github.com/coolapso/agent-skills-validator@latest</code></pre>
+                            <button type="button" data-copy
+                                class="absolute top-2 right-2 text-xs font-semibold bg-gray-700 hover:bg-gray-600 text-white px-2.5 py-1 rounded-md">Copy</button>
+                        </div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">Arch Linux (AUR)</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Prebuilt binary package.</p>
+                        <div class="relative bg-gray-900 dark:bg-black rounded-lg">
+                            <pre class="text-gray-100 text-sm p-4 pr-20 overflow-x-auto"><code>yay -S agent-skills-validator-bin</code></pre>
+                            <button type="button" data-copy
+                                class="absolute top-2 right-2 text-xs font-semibold bg-gray-700 hover:bg-gray-600 text-white px-2.5 py-1 rounded-md">Copy</button>
+                        </div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">Packages and binaries</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4"><code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">.deb</code>,
+                            <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">.rpm</code>, and archives for every platform,
+                            each listed in <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">checksums.txt</code>.</p>
+                        <a href="https://github.com/coolapso/agent-skills-validator/releases"
+                            class="inline-flex items-center gap-2 font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                            Go to the releases page →
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Usage -->
+        <section id="usage"
+            class="bg-white dark:bg-gray-800 py-20 border-t border-gray-100 dark:border-gray-700 transition-colors duration-200">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-3xl font-bold text-center mb-12 dark:text-white">Usage</h2>
+                <div class="flex flex-col gap-10">
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">Validate one or many skills</h3>
+                        <div class="relative bg-gray-900 dark:bg-black rounded-lg mb-6">
+                            <pre class="text-gray-100 text-sm p-4 pr-20 overflow-x-auto"><code># one skill
+agent-skills-validator validate ./skills/pdf-processing
+
+# every skill, machine readable
+agent-skills-validator validate --format json skills/*/
+
+# recommendations are errors, any warning fails
+agent-skills-validator validate --strict --fail-on-warnings ./my-skill</code></pre>
+                            <button type="button" data-copy
+                                class="absolute top-2 right-2 text-xs font-semibold bg-gray-700 hover:bg-gray-600 text-white px-2.5 py-1 rounded-md">Copy</button>
+                        </div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">Exit codes</h3>
+                        <table class="w-full text-sm border-collapse">
+                            <tbody>
+                                <tr class="border-b border-gray-200 dark:border-gray-700">
+                                    <td class="py-2 pr-4 font-mono font-semibold w-12">0</td>
+                                    <td class="py-2 text-gray-600 dark:text-gray-300">No errors. Warnings may be present unless
+                                        <code>--fail-on-warnings</code> is set.</td>
+                                </tr>
+                                <tr class="border-b border-gray-200 dark:border-gray-700">
+                                    <td class="py-2 pr-4 font-mono font-semibold">1</td>
+                                    <td class="py-2 text-gray-600 dark:text-gray-300">Validation errors, or warnings promoted to failures.</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 pr-4 font-mono font-semibold">2</td>
+                                    <td class="py-2 text-gray-600 dark:text-gray-300">CLI misuse or an input path that does not exist.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">What you get back</h3>
+                        <div class="bg-gray-900 dark:bg-black rounded-lg mb-6">
+                            <pre class="text-gray-100 text-sm p-4 overflow-x-auto"><code><span class="diag-ok">skills/pdf-processing: valid</span>
+skills/data/SKILL.md:2: <span class="diag-error">error AS004</span>: name "data-analysis" must match the skill directory name "data"
+skills/data/SKILL.md:7: <span class="diag-error">error AS008</span>: metadata value for "version" must be a string, got a float; quote it if it is a number or boolean
+skills/data/SKILL.md:501: <span class="diag-warning">warning AS010</span>: SKILL.md has 512 lines; the specification recommends keeping it under 500 lines and moving detail into referenced files
+
+2 skills validated, 1 valid, 1 invalid (2 errors, 1 warning)</code></pre>
+                        </div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">Or as JSON</h3>
+                        <div class="bg-gray-900 dark:bg-black rounded-lg">
+                            <pre class="text-gray-100 text-sm p-4 overflow-x-auto"><code>{
+  "version": 1,
+  "skills": [
+    {
+      "path": "skills/data",
+      "valid": false,
+      "diagnostics": [
+        {
+          "rule": "AS004",
+          "severity": "error",
+          "path": "skills/data/SKILL.md",
+          "line": 2,
+          "message": "name \"data-analysis\" must match the skill directory name \"data\""
+        }
+      ]
+    }
+  ]
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Rules -->
+        <section id="rules" class="py-20">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-3xl font-bold text-center mb-4 dark:text-white">Validation rules</h2>
+                <p class="text-center text-gray-600 dark:text-gray-300 mb-12">One rule per requirement in the specification.
+                    Run <code class="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-sm">agent-skills-validator rules</code>
+                    to print this table and the specification revision baked into your binary.</p>
+                <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 dark:bg-gray-700 text-left">
+                            <tr>
+                                <th class="px-4 py-3 font-semibold">ID</th>
+                                <th class="px-4 py-3 font-semibold">Severity</th>
+                                <th class="px-4 py-3 font-semibold">Rule</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700 text-gray-700 dark:text-gray-300">
+                            <tr><td class="px-4 py-3 font-mono font-semibold">AS001</td><td class="px-4 py-3"><span class="rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 text-xs font-semibold">error</span></td><td class="px-4 py-3">Target is a directory containing <code>SKILL.md</code>.</td></tr>
+                            <tr><td class="px-4 py-3 font-mono font-semibold">AS002</td><td class="px-4 py-3"><span class="rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 text-xs font-semibold">error</span></td><td class="px-4 py-3"><code>SKILL.md</code> is valid UTF-8, begins with YAML frontmatter and has a closing delimiter.</td></tr>
+                            <tr><td class="px-4 py-3 font-mono font-semibold">AS003</td><td class="px-4 py-3"><span class="rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 text-xs font-semibold">error</span></td><td class="px-4 py-3"><code>name</code> is a string of 1-64 Unicode lowercase alphanumeric characters or single hyphens; it does not start or end with a hyphen.</td></tr>
+                            <tr><td class="px-4 py-3 font-mono font-semibold">AS004</td><td class="px-4 py-3"><span class="rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 text-xs font-semibold">error</span></td><td class="px-4 py-3"><code>name</code> matches the parent directory name.</td></tr>
+                            <tr><td class="px-4 py-3 font-mono font-semibold">AS005</td><td class="px-4 py-3"><span class="rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 text-xs font-semibold">error</span></td><td class="px-4 py-3"><code>description</code> is a non-empty string of at most 1024 characters.</td></tr>
+                            <tr><td class="px-4 py-3 font-mono font-semibold">AS006</td><td class="px-4 py-3"><span class="rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 text-xs font-semibold">error</span></td><td class="px-4 py-3">When present, <code>license</code> is a string.</td></tr>
+                            <tr><td class="px-4 py-3 font-mono font-semibold">AS007</td><td class="px-4 py-3"><span class="rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 text-xs font-semibold">error</span></td><td class="px-4 py-3">When present, <code>compatibility</code> is a 1-500 character string.</td></tr>
+                            <tr><td class="px-4 py-3 font-mono font-semibold">AS008</td><td class="px-4 py-3"><span class="rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 text-xs font-semibold">error</span></td><td class="px-4 py-3">When present, <code>metadata</code> is a mapping of string keys to string values.</td></tr>
+                            <tr><td class="px-4 py-3 font-mono font-semibold">AS009</td><td class="px-4 py-3"><span class="rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 text-xs font-semibold">error</span></td><td class="px-4 py-3">When present, <code>allowed-tools</code> is a string.</td></tr>
+                            <tr><td class="px-4 py-3 font-mono font-semibold">AS010</td><td class="px-4 py-3"><span class="rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-xs font-semibold">warning</span></td><td class="px-4 py-3"><code>SKILL.md</code> exceeds the specification's 500-line recommendation. Becomes an error with <code>--strict</code>.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">Unknown frontmatter keys and extra files or
+                    directories are permitted by the specification and never produce diagnostics.</p>
+            </div>
+        </section>
+
+        <!-- GitHub Action -->
+        <section id="action"
+            class="bg-white dark:bg-gray-800 py-20 border-t border-gray-100 dark:border-gray-700 transition-colors duration-200">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-3xl font-bold text-center mb-4 dark:text-white">GitHub Action</h2>
+                <p class="text-center text-gray-600 dark:text-gray-300 mb-12">The action downloads the release binary for the
+                    runner, verifies its checksum and runs it. Linux, macOS and Windows runners are supported.</p>
+                <div class="flex flex-col gap-8">
+                    <div class="relative bg-gray-900 dark:bg-black rounded-lg">
+                        <pre class="text-gray-100 text-sm p-4 pr-20 overflow-x-auto"><code>jobs:
+  validate-skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: coolapso/agent-skills-validator@v1
+        with:
+          path: skills/terraform-skill
+          strict: true</code></pre>
+                        <button type="button" data-copy
+                            class="absolute top-2 right-2 text-xs font-semibold bg-gray-700 hover:bg-gray-600 text-white px-2.5 py-1 rounded-md">Copy</button>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg mb-3 dark:text-white">Inputs</h3>
+                        <dl class="text-sm space-y-3 text-gray-600 dark:text-gray-300">
+                            <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">path</dt><dd>Skill directory to validate. Default <code>.</code></dd></div>
+                            <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">version</dt><dd>CLI release to download. Pinned per action release; <code>latest</code> is accepted.</dd></div>
+                            <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">strict</dt><dd>Pass <code>--strict</code>. Default <code>false</code></dd></div>
+                            <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">fail-on-warnings</dt><dd>Pass <code>--fail-on-warnings</code>. Default <code>false</code></dd></div>
+                            <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">format</dt><dd><code>text</code> or <code>json</code>. With <code>json</code> the report is exposed through the <code>json</code> and <code>json-file</code> outputs.</dd></div>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-gray-200 dark:border-gray-700 py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div class="text-sm text-gray-500 dark:text-gray-400 text-center md:text-left">
+                <p>MIT licensed. Built by <a href="https://github.com/coolapso" class="underline">coolapso</a>.</p>
+                <p class="mt-1">Not affiliated with the Agent Skills specification authors.</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="https://github.com/sponsors/coolapso"
+                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    ❤️ Sponsor
+                </a>
+                <a href="https://www.buymeacoffee.com/coolapso" target="_blank" rel="noopener">
+                    <img src="https://cdn.buymeacoffee.com/buttons/default-yellow.png" alt="Buy Me A Coffee" class="h-10">
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const darkIcon = document.getElementById('theme-toggle-dark-icon');
+        const lightIcon = document.getElementById('theme-toggle-light-icon');
+        const isDark = () => document.documentElement.classList.contains('dark');
+        const syncIcons = () => {
+            darkIcon.classList.toggle('hidden', isDark());
+            lightIcon.classList.toggle('hidden', !isDark());
+        };
+        syncIcons();
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('color-theme', isDark() ? 'dark' : 'light');
+            syncIcons();
+        });
+
+        document.querySelectorAll('[data-copy]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const code = button.parentElement.querySelector('code');
+                try {
+                    await navigator.clipboard.writeText(code.innerText);
+                    button.textContent = 'Copied!';
+                } catch (err) {
+                    button.textContent = 'Failed';
+                }
+                setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+            });
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,11 @@
+.git
+.github
+.task
+.semrel
+dist
+site
+*.md
+!README.md
+agent-skills-validator
+agent-skills-validator.exe
+coverage.out

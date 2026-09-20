@@ -1,0 +1,19 @@
+{
+  "semrelLockVersion": 1,
+  "updatedAt": "2026-09-20T08:09:09Z",
+  "plugins": [
+    {
+      "binaryName": "semrel-plugin-github",
+      "ref": "@semrel/provider-github",
+      "version": "0.1.0",
+      "checksums": {
+        "darwin_amd64": "81cd4ac815ed04d9b4b41d727bc2d57c6263e8a2ce13cb84e3492a10da6d1b90",
+        "darwin_arm64": "a1855c3a78e43ec395ca449654ce4a33e87654ad7089af272668c2c6e0e1e012",
+        "linux_amd64": "06bc5db6e46df15869919e3a76baf7b91742b0d5703cc8e610ddcb2e3bfcfce1",
+        "linux_arm64": "5d2691ac5c737264e06b52ab89b3926b88f6425cef4ce889127288cd7d92265a",
+        "windows_amd64": "6ac407296336f7e39f8c265463f0e888b2ba853266cdf8556b16a9d78d563a13",
+        "windows_arm64": "41bbf10e73528894d61688db66bebe38ea5474beb1a8098bd23b2ec58a1f6e32"
+      }
+    }
+  ]
+}

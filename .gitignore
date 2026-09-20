@@ -1,0 +1,19 @@
+# Build output
+/agent-skills-validator
+/agent-skills-validator.exe
+/dist/
+/coverage.out
+
+# semrel plugin binaries (restored from .semrel.lock with `semrel plugin restore`)
+/.semrel/
+
+# Release metadata written by semrel
+/.semrel-release.json
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Task cache
+/.task/

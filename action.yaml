@@ -1,0 +1,91 @@
+name: "Agent Skills Validator"
+description: "Validate Agent Skills (SKILL.md) against the public Agent Skills specification"
+author: "coolapso"
+branding:
+  icon: "check-square"
+  color: "green"
+
+inputs:
+  path:
+    description: "Skill directory to validate (a directory containing SKILL.md)"
+    required: false
+    default: "."
+  version:
+    description: "agent-skills-validator release to download (e.g. 1.2.3). Defaults to the CLI version pinned by this action release; 'latest' resolves the newest release."
+    required: false
+    default: "0.1.0" # pinned-cli-version (updated automatically by `task release`)
+  strict:
+    description: "Treat specification recommendations as errors (passes --strict)"
+    required: false
+    default: "false"
+  fail-on-warnings:
+    description: "Fail when warnings are present (passes --fail-on-warnings)"
+    required: false
+    default: "false"
+  format:
+    description: "CLI output format: text or json. With json, the report is also exposed through the action outputs."
+    required: false
+    default: "text"
+
+outputs:
+  exit-code:
+    description: "Exit code of the CLI: 0 valid, 1 invalid, 2 misuse"
+    value: ${{ steps.validate.outputs.exit-code }}
+  json:
+    description: "The JSON report when format is json, otherwise empty"
+    value: ${{ steps.validate.outputs.json }}
+  json-file:
+    description: "Path to a file holding the JSON report when format is json, otherwise empty"
+    value: ${{ steps.validate.outputs.json-file }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install agent-skills-validator
+      id: install
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        INSTALL_DIR: ${{ runner.temp }}/agent-skills-validator
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        bash "${GITHUB_ACTION_PATH}/site/install.sh"
+        suffix=""
+        [[ "$RUNNER_OS" == "Windows" ]] && suffix=".exe"
+        echo "bin=${INSTALL_DIR}/agent-skills-validator${suffix}" >> "$GITHUB_OUTPUT"
+
+    - name: Validate skill
+      id: validate
+      shell: bash
+      env:
+        ASV_BIN: ${{ steps.install.outputs.bin }}
+        ASV_PATH: ${{ inputs.path }}
+        ASV_STRICT: ${{ inputs.strict }}
+        ASV_FAIL_ON_WARNINGS: ${{ inputs.fail-on-warnings }}
+        ASV_FORMAT: ${{ inputs.format }}
+      run: |
+        set +e
+        args=(validate --format "$ASV_FORMAT")
+        [[ "$ASV_STRICT" == "true" ]] && args+=(--strict)
+        [[ "$ASV_FAIL_ON_WARNINGS" == "true" ]] && args+=(--fail-on-warnings)
+
+        if [[ "$ASV_FORMAT" == "json" ]]; then
+          report="${RUNNER_TEMP}/agent-skills-validator-report.json"
+          "$ASV_BIN" "${args[@]}" "$ASV_PATH" > "$report"
+          code=$?
+          cat "$report"
+          echo "json-file=$report" >> "$GITHUB_OUTPUT"
+          {
+            echo "json<<ASV_EOF"
+            cat "$report"
+            echo "ASV_EOF"
+          } >> "$GITHUB_OUTPUT"
+        else
+          "$ASV_BIN" "${args[@]}" "$ASV_PATH"
+          code=$?
+          echo "json-file=" >> "$GITHUB_OUTPUT"
+          echo "json=" >> "$GITHUB_OUTPUT"
+        fi
+
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit $code

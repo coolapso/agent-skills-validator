@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+# Fixtures must reach every platform byte-for-byte: the CRLF fixture must stay
+# CRLF and the LF fixtures must stay LF, regardless of core.autocrlf. This line
+# must come after the catch-all above because later rules win.
+internal/validator/testdata/** -text

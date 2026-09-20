@@ -1,0 +1,289 @@
+version: '3'
+
+vars:
+  NAME: "agent-skills-validator"
+  REPOSITORY: "github.com/coolapso/agent-skills-validator"
+  CONTAINER_REGISTRY: "ghcr.io/coolapso"
+  CONTAINER_PLATFORMS: "linux/amd64,linux/arm64"
+  MODULE: "github.com/coolapso/agent-skills-validator"
+  SEMREL_VERSION: "v0.26.2"
+  GORELEASER_VERSION: "v2.18.2"
+  GOLANGCI_LINT_VERSION: "v2.13.2"
+  FIXTURES: "internal/validator/testdata"
+  VERSION:
+    sh: git describe --tags --always --dirty="-dev" 2>/dev/null || echo dev
+  LDFLAGS: "-s -w -X {{.MODULE}}/cmd.Version={{.VERSION}}"
+
+tasks:
+  default:
+    desc: "List available tasks"
+    cmds:
+      - task --list
+
+  # ---------------------------------------------------------------- tooling
+
+  tools:install:
+    desc: "Install semrel, GoReleaser and golangci-lint at the pinned versions, then restore semrel plugins"
+    cmds:
+      - go install github.com/SemRels/semrel/cmd/semrel@{{.SEMREL_VERSION}}
+      - go install github.com/goreleaser/goreleaser/v2@{{.GORELEASER_VERSION}}
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+      - task: tools:semrel-plugins
+
+  tools:semrel-plugins:
+    desc: "Install the semrel plugins pinned in .semrel.lock into .semrel/plugins"
+    cmds:
+      - semrel plugin restore
+    status:
+      - test -d .semrel/plugins
+
+  # ---------------------------------------------------------------- develop
+
+  fmt:
+    desc: "Format Go code"
+    cmds:
+      - go fmt ./...
+
+  fmt:check:
+    desc: "Fail when any Go file is not gofmt-formatted"
+    cmds:
+      - |
+        files=$(gofmt -l .)
+        if [[ -n "$files" ]]; then
+          echo -e "The following files are not formatted:\n$files"
+          exit 1
+        fi
+
+  vet:
+    desc: "Run go vet"
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: "Run golangci-lint"
+    cmds:
+      - golangci-lint run ./...
+
+  test:
+    desc: "Run unit tests"
+    cmds:
+      - go test -race -count=1 ./...
+
+  test:cover:
+    desc: "Run unit tests with a coverage report"
+    cmds:
+      - go test -race -count=1 -coverprofile=coverage.out ./...
+      - go tool cover -func=coverage.out | tail -1
+
+  test:golden:update:
+    desc: "Regenerate the JSON golden file after an intentional output change"
+    cmds:
+      - UPDATE_GOLDEN=1 go test ./internal/validator/ -run TestJSONOutputStability
+
+  build:
+    desc: "Build the binary for the current platform into ./agent-skills-validator"
+    cmds:
+      - CGO_ENABLED=0 go build -trimpath -ldflags '{{.LDFLAGS}}' -o {{.NAME}} .
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - "{{.NAME}}"
+
+  install:
+    desc: "Install the binary into $(go env GOPATH)/bin"
+    cmds:
+      - CGO_ENABLED=0 go install -trimpath -ldflags '{{.LDFLAGS}}' .
+
+  run:
+    desc: "Run the CLI from source, e.g. task run -- validate ./my-skill"
+    cmds:
+      - go run . {{.CLI_ARGS}}
+
+  fixtures:smoke:
+    desc: "Run the built binary against the fixtures and assert the documented exit codes"
+    deps: [build]
+    cmds:
+      - ./{{.NAME}} validate {{.FIXTURES}}/valid/*/
+      - ./{{.NAME}} validate --fail-on-warnings {{.FIXTURES}}/warn/as010-long && exit 1 || test $? -eq 1
+      - ./{{.NAME}} validate --format json {{.FIXTURES}}/invalid/*/ >/dev/null && exit 1 || test $? -eq 1
+      - ./{{.NAME}} validate ./this/path/does/not/exist 2>/dev/null && exit 1 || test $? -eq 2
+
+  shellcheck:
+    desc: "Lint the install scripts with shellcheck"
+    cmds:
+      - shellcheck site/install.sh site/uninstall.sh
+
+  check:
+    desc: "Run every check CI runs: formatting, vet, lint, tests, shellcheck and the fixture smoke test"
+    cmds:
+      - task: fmt:check
+      - task: vet
+      - task: lint
+      - task: test
+      - task: shellcheck
+      - task: fixtures:smoke
+
+  site:serve:
+    desc: "Preview the website with live reload using go-live-server (https://github.com/coolapso/go-live-server)"
+    dir: site
+    cmds:
+      - live-server --watch-dir . --port :8080
+
+  clean:
+    desc: "Remove build and release output"
+    cmds:
+      - rm -rf {{.NAME}} {{.NAME}}.exe dist coverage.out .semrel-release.json
+
+  # -------------------------------------------------------------- container
+
+  container:build:
+    desc: "Build the container image for the current platform as agent-skills-validator:latest"
+    cmds:
+      - docker build --build-arg VERSION={{.VERSION}} -t {{.NAME}}:latest .
+
+  container:build:all:
+    desc: "Build the container image for amd64 and arm64 (needs buildx and QEMU)"
+    cmds:
+      - docker buildx build --platform {{.CONTAINER_PLATFORMS}} --build-arg VERSION={{.VERSION}} -t {{.NAME}}:latest .
+
+  container:smoke:
+    desc: "Run the local image against the fixtures"
+    deps: [container:build]
+    cmds:
+      - docker run --rm -v "$PWD/{{.FIXTURES}}:/data:ro" {{.NAME}}:latest validate valid/full valid/crlf
+      - docker run --rm -v "$PWD/{{.FIXTURES}}:/data:ro" {{.NAME}}:latest validate invalid/as004-mismatch && exit 1 || test $? -eq 1
+
+  container:login:
+    desc: "Log in to GHCR (GHCR_PASSWORD, GITHUB_TOKEN, or the gh CLI token)"
+    cmds:
+      - |
+        set -euo pipefail
+        if [[ -z "${GHCR_PASSWORD:-}" ]]; then
+          GHCR_PASSWORD="${GITHUB_TOKEN:-$(gh auth token)}"
+        fi
+        echo "$GHCR_PASSWORD" | docker login ghcr.io -u coolapso --password-stdin
+
+  container:push:
+    desc: "Build and push multi-arch images tagged latest and with the current release version to GHCR"
+    deps: [container:login]
+    cmds:
+      - |
+        set -euo pipefail
+        git fetch --tags --quiet || true
+        git_tag="$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
+        tag="${git_tag#v}"
+        docker buildx build --push --platform {{.CONTAINER_PLATFORMS}} \
+          --build-arg VERSION="${tag}" \
+          -t "{{.CONTAINER_REGISTRY}}/{{.NAME}}:latest" \
+          -t "{{.CONTAINER_REGISTRY}}/{{.NAME}}:${tag}" .
+
+  # ---------------------------------------------------------------- release
+
+  snapshot:
+    desc: "Build every release artifact locally into ./dist without publishing"
+    cmds:
+      - goreleaser release --snapshot --clean --skip=publish,announce,aur
+
+  release:dry-run:
+    desc: "Show the next version and release notes semrel would create"
+    deps: [tools:semrel-plugins]
+    cmds:
+      - semrel release --dry-run
+
+  release:next-version:
+    desc: "Print the next version semrel would release (empty when nothing is releasable)"
+    deps: [tools:semrel-plugins]
+    silent: true
+    cmds:
+      - |
+        semrel release --dry-run --no-color -o json 2>/dev/null \
+          | sed -n '/^{/,/^}/p' \
+          | jq -r 'select(.released == true) | .next_version // empty'
+
+  release:pin-action:
+    desc: "Pin the GitHub Action's default CLI version to the version about to be released and commit it"
+    cmds:
+      - |
+        set -euo pipefail
+        next="$(task release:next-version)"
+        if [[ -z "$next" ]]; then
+          echo "Nothing to release; leaving action.yaml untouched"
+          exit 0
+        fi
+        version="${next#v}"
+        perl -pi -e 's/^(\s*default:\s*")[0-9]+\.[0-9]+\.[0-9]+(".*# pinned-cli-version)/${1}'"$version"'${2}/' action.yaml
+        if git diff --quiet -- action.yaml; then
+          echo "action.yaml already pins $version"
+          exit 0
+        fi
+        git add action.yaml
+        git commit -m "build(action): pin CLI to ${next}"
+        echo "Pinned action.yaml to $version"
+
+  release:gh:
+    desc: "Create the tag and GitHub release with semrel (pins the action version first)"
+    deps: [tools:semrel-plugins]
+    cmds:
+      - |
+        set -euo pipefail
+        branch="$(git branch --show-current)"
+        if [[ -z "${CI:-}" ]]; then
+          git pull --rebase origin "$branch"
+        fi
+        if [[ -z "${SEMREL_PLUGIN_TOKEN:-}" ]]; then
+          export SEMREL_PLUGIN_TOKEN="${GITHUB_TOKEN:-$(gh auth token)}"
+        fi
+        task release:pin-action
+        git push origin "$branch"
+        semrel release --output-file .semrel-release.json
+
+  release:artifacts:
+    desc: "Build and upload the release artifacts for the current tag with GoReleaser"
+    cmds:
+      - |
+        set -euo pipefail
+        if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+          export GITHUB_TOKEN="$(gh auth token)"
+        fi
+        goreleaser release --clean
+
+  release:major-tag:
+    desc: "Move the floating major tag (v1, v2, ...) to the latest release tag so `uses: coolapso/agent-skills-validator@v1` works"
+    cmds:
+      - |
+        set -euo pipefail
+        tag="$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
+        major="${tag%%.*}"
+        git tag -f "$major" "$tag"
+        git push -f origin "$major"
+        echo "$major -> $tag"
+
+  release:
+    desc: "Run the full release from this machine: checks, semrel tag + GitHub release, GoReleaser artifacts, major tag, container images"
+    cmds:
+      - task: check
+      - task: container:smoke
+      - task: release:gh
+      - |
+        if [[ ! -f .semrel-release.json ]] || [[ "$(jq -r .released .semrel-release.json)" != "true" ]]; then
+          echo "semrel did not create a release; skipping artifacts"
+          exit 0
+        fi
+        task release:artifacts
+        task release:major-tag
+        task container:push
+
+  release:ci:
+    desc: "Release steps for GitHub Actions (tests already ran in a previous job)"
+    cmds:
+      - task: release:gh
+      - |
+        if [[ ! -f .semrel-release.json ]] || [[ "$(jq -r .released .semrel-release.json)" != "true" ]]; then
+          echo "semrel did not create a release; skipping artifacts"
+          exit 0
+        fi
+        task release:artifacts
+        task release:major-tag
+        task container:push

@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "rulesVersion": 1,
+  "skills": [
+    {
+      "path": "testdata/valid/minimal",
+      "valid": true,
+      "diagnostics": []
+    },
+    {
+      "path": "testdata/invalid/as004-mismatch",
+      "valid": false,
+      "diagnostics": [
+        {
+          "rule": "AS004",
+          "severity": "error",
+          "path": "testdata/invalid/as004-mismatch/SKILL.md",
+          "line": 2,
+          "message": "name \"some-other-name\" must match the skill directory name \"as004-mismatch\""
+        }
+      ]
+    },
+    {
+      "path": "testdata/warn/as010-long",
+      "valid": true,
+      "diagnostics": [
+        {
+          "rule": "AS010",
+          "severity": "warning",
+          "path": "testdata/warn/as010-long/SKILL.md",
+          "line": 501,
+          "message": "SKILL.md has 501 lines; the specification recommends keeping it under 500 lines and moving detail into referenced files"
+        }
+      ]
+    }
+  ]
+}

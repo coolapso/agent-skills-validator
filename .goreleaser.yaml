@@ -1,0 +1,91 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+#
+# GoReleaser only builds and uploads artifacts. Versioning, tagging, and the
+# GitHub release itself are handled by semrel (see .semrel.yaml and
+# Taskfile.yml), which runs first; GoReleaser then attaches the binaries to the
+# release semrel created and keeps its release notes.
+version: 2
+project_name: agent-skills-validator
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: agent-skills-validator
+    binary: agent-skills-validator
+    main: .
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/coolapso/agent-skills-validator/cmd.Version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+# The archive and checksum names are part of the GitHub Action contract: see
+# scripts/install-release.sh, which downloads and verifies them.
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  # semrel generates the release notes.
+  disable: true
+
+release:
+  github:
+    owner: coolapso
+    name: agent-skills-validator
+  mode: keep-existing
+
+nfpms:
+  - id: packages
+    package_name: agent-skills-validator
+    homepage: "https://github.com/coolapso/agent-skills-validator"
+    maintainer: "coolapso <coolapso@coolapso.tech>"
+    description: "Validate Agent Skills against the public specification"
+    license: "MIT"
+    formats:
+      - deb
+      - rpm
+
+aurs:
+  - name: agent-skills-validator-bin
+    homepage: "https://github.com/coolapso/agent-skills-validator"
+    description: "Validate Agent Skills against the public specification"
+    maintainers:
+      - "coolapso <coolapso@coolapso.tech>"
+    license: "MIT"
+    # Publishing is skipped when AUR_KEY is not set so a local release without
+    # the key still succeeds; the PKGBUILD is generated either way.
+    private_key: '{{ index .Env "AUR_KEY" }}'
+    skip_upload: '{{ if index .Env "AUR_KEY" }}auto{{ else }}true{{ end }}'
+    git_url: "ssh://aur@aur.archlinux.org/agent-skills-validator-bin.git"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+announce:
+  discord:
+    # Only announce when the webhook is configured.
+    enabled: '{{ if index .Env "DISCORD_WEBHOOK_ID" }}true{{ else }}false{{ end }}'
