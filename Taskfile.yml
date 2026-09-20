@@ -28,13 +28,37 @@ tasks:
 
   # ---------------------------------------------------------------- tooling
 
+  # Each tool is installed with `go install` only when it is missing from PATH,
+  # so a machine that already has it (AUR, brew, ...) is left untouched. CI
+  # starts empty and gets the pinned versions.
   tools:install:
-    desc: "Install semrel, GoReleaser and golangci-lint at the pinned versions, then restore semrel plugins"
+    desc: "Install semrel, GoReleaser and golangci-lint if missing, then restore semrel plugins"
+    cmds:
+      - task: tools:semrel
+      - task: tools:goreleaser
+      - task: tools:golangci-lint
+      - task: tools:semrel-plugins
+
+  tools:semrel:
+    desc: "Install semrel {{.SEMREL_VERSION}} unless already on PATH"
+    status:
+      - command -v semrel
     cmds:
       - go install github.com/SemRels/semrel/cmd/semrel@{{.SEMREL_VERSION}}
+
+  tools:goreleaser:
+    desc: "Install GoReleaser {{.GORELEASER_VERSION}} unless already on PATH"
+    status:
+      - command -v goreleaser
+    cmds:
       - go install github.com/goreleaser/goreleaser/v2@{{.GORELEASER_VERSION}}
+
+  tools:golangci-lint:
+    desc: "Install golangci-lint {{.GOLANGCI_LINT_VERSION}} unless already on PATH"
+    status:
+      - command -v golangci-lint
+    cmds:
       - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
-      - task: tools:semrel-plugins
 
   tools:semrel-plugins:
     desc: "Install the semrel plugins pinned in .semrel.lock into .semrel/plugins (idempotent, always runs so a stale plugin version never lingers)"
