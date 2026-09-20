@@ -4,6 +4,7 @@ vars:
   NAME: "agent-skills-validator"
   REPOSITORY: "github.com/coolapso/agent-skills-validator"
   CONTAINER_REGISTRY: "ghcr.io/coolapso"
+  CF_PAGES_PROJECT: "agent-skills-validator"
   CONTAINER_PLATFORMS: "linux/amd64,linux/arm64"
   MODULE: "github.com/coolapso/agent-skills-validator"
   SEMREL_VERSION: "v0.26.2"
@@ -130,6 +131,11 @@ tasks:
     dir: site
     cmds:
       - live-server --watch-dir . --port :8080
+
+  site:deploy:
+    desc: "Publish the website to Cloudflare Pages (https://agent-skills-validator.coolapso.sh)"
+    cmds:
+      - wrangler pages deploy site --project-name={{.CF_PAGES_PROJECT}}
 
   clean:
     desc: "Remove build and release output"

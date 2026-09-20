@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Remove agent-skills-validator installed by install.sh.
-#   curl -fsSL https://coolapso.github.io/agent-skills-validator/uninstall.sh | bash
+#   curl -fsSL https://agent-skills-validator.coolapso.sh/uninstall.sh | bash
 set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"

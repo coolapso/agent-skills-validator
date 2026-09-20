@@ -17,3 +17,6 @@
 
 # Task cache
 /.task/
+
+# wrangler local state
+/.wrangler/

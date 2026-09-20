@@ -9,7 +9,7 @@
 An independent Go CLI and GitHub Action that validate skill directories against the public
 [Agent Skills specification](https://agentskills.io/specification).
 
-Website: <https://coolapso.github.io/agent-skills-validator/>
+Website: <https://agent-skills-validator.coolapso.sh/>
 
 It checks the portable `SKILL.md` contract and nothing else: no Markdown quality opinions,
 no host-specific fields, no repository conventions, no network access.
@@ -207,16 +207,16 @@ The image is built from `scratch`, runs as a non-root user, and contains only th
 Downloads the latest release, verifies the checksum and installs to `/usr/local/bin`:
 
 ```sh
-curl -fsSL https://coolapso.github.io/agent-skills-validator/install.sh | bash
+curl -fsSL https://agent-skills-validator.coolapso.sh/install.sh | bash
 ```
 
 Pin a version or change the destination:
 
 ```sh
-curl -fsSL https://coolapso.github.io/agent-skills-validator/install.sh | VERSION=v1.0.0 INSTALL_DIR=~/.local/bin bash
+curl -fsSL https://agent-skills-validator.coolapso.sh/install.sh | VERSION=v1.0.0 INSTALL_DIR=~/.local/bin bash
 ```
 
-Uninstall with `curl -fsSL https://coolapso.github.io/agent-skills-validator/uninstall.sh | bash`.
+Uninstall with `curl -fsSL https://agent-skills-validator.coolapso.sh/uninstall.sh | bash`.
 
 ### Go install
 
@@ -263,8 +263,9 @@ task container:smoke # build the container image and run it against the fixtures
 task site:serve      # preview the website with live reload (needs go-live-server)
 ```
 
-The website under `site/` is plain HTML and is published to GitHub Pages by the
-`Deploy site to GitHub Pages` workflow on every push to `main` that touches it.
+The website under `site/` is plain HTML and is published to Cloudflare Pages at
+<https://agent-skills-validator.coolapso.sh> by `task site:deploy` or by the
+`Deploy site to Cloudflare Pages` workflow on every push to `main` that touches it.
 
 Every rule has fixtures under `internal/validator/testdata`. Add a fixture and a table entry in
 `internal/validator/validator_test.go` whenever a rule changes.

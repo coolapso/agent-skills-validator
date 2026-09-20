@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Install agent-skills-validator from GitHub Releases.
 #
-#   curl -fsSL https://coolapso.github.io/agent-skills-validator/install.sh | bash
-#   curl -fsSL https://coolapso.github.io/agent-skills-validator/install.sh | VERSION=v1.2.0 bash
+#   curl -fsSL https://agent-skills-validator.coolapso.sh/install.sh | bash
+#   curl -fsSL https://agent-skills-validator.coolapso.sh/install.sh | VERSION=v1.2.0 bash
 #
 # Also used by action.yaml, which sets INSTALL_DIR to a writable temp directory.
 #

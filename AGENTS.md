@@ -29,8 +29,10 @@ external URLs or reference-link existence, and it never touches the network.
   - `testdata/` — fixtures: `valid/`, `invalid/`, `warn/`, and `golden/report.json`.
 - `action.yaml` — the composite GitHub Action. It runs `site/install.sh` with `INSTALL_DIR` set to
   the runner's temp directory, then executes the binary.
-- `site/` — the static website served by GitHub Pages at
-  <https://coolapso.github.io/agent-skills-validator/>: `index.html` (plain HTML with Tailwind from
+- `site/` — the static website served by Cloudflare Pages at
+  <https://agent-skills-validator.coolapso.sh/> (project `agent-skills-validator`, deployed with
+  wrangler by `task site:deploy` or the `deploypages.yaml` workflow; never GitHub Pages):
+  `index.html` (plain HTML with Tailwind from
   the CDN, no build step), `install.sh` (the single installer: curl-pipe for users and the download
   step of the action; verifies `checksums.txt`, supports `VERSION`, `INSTALL_DIR`, `GH_TOKEN`) and
   `uninstall.sh`. Keep the rule table and flags on the page in sync with the CLI and README.
@@ -46,7 +48,7 @@ external URLs or reference-link existence, and it never touches the network.
 - `.semrel.yaml`, `.semrel.lock`, `.goreleaser.yaml` — release tooling configuration.
 - `.github/workflows/` — `test.yaml` (lint, tests, fixtures on Linux/macOS/Windows),
   `action-test.yaml` (runs the action against fixtures on three OSes once a release exists),
-  `release.yaml` (runs `task release:ci`), `pages.yaml` (publishes `site/` to GitHub Pages).
+  `release.yaml` (runs `task release:ci`), `deploypages.yaml` (publishes `site/` to Cloudflare Pages).
 
 ## Design decisions you must preserve
 
