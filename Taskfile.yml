@@ -303,7 +303,7 @@ tasks:
         goreleaser release --clean
 
   release:major-tag:
-    desc: "Move the floating major tag (v1, v2, ...) to the latest release tag so `uses: coolapso/agent-skills-validator@v1` works"
+    desc: "Move the floating major tag (v0, v1, ...) to the latest release tag so `uses: coolapso/agent-skills-validator@v0` works"
     cmds:
       - |
         set -euo pipefail

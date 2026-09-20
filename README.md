@@ -135,7 +135,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: coolapso/agent-skills-validator@v1
+      - uses: coolapso/agent-skills-validator@v0
         with:
           path: skills/terraform-skill
           strict: true
@@ -144,7 +144,7 @@ jobs:
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `path` | `.` | Skill directory to validate. |
-| `version` | Follows the action ref | CLI release to download: `1.2.3`, `v1` (newest 1.x) or `latest`. Empty follows the action ref, so `@v1.2.3` runs CLI 1.2.3 and `@v1` the newest 1.x. |
+| `version` | Follows the action ref | CLI release to download: `0.1.0`, `v0` (newest 0.x) or `latest`. Empty follows the action ref, so `@v0.1.0` runs CLI 0.1.0 and `@v0` the newest 0.x. Once 1.0 ships, use `@v1`. |
 | `strict` | `false` | Pass `--strict`. |
 | `fail-on-warnings` | `false` | Pass `--fail-on-warnings`. |
 | `format` | `text` | CLI output format. With `json` the report is also exposed as action outputs. |
@@ -166,7 +166,7 @@ strategy:
     skill: [skills/pdf-processing, skills/data-analysis]
 steps:
   - uses: actions/checkout@v5
-  - uses: coolapso/agent-skills-validator@v1
+  - uses: coolapso/agent-skills-validator@v0
     with:
       path: ${{ matrix.skill }}
 ```
@@ -174,7 +174,7 @@ steps:
 Consume the JSON report:
 
 ```yaml
-- uses: coolapso/agent-skills-validator@v1
+- uses: coolapso/agent-skills-validator@v0
   id: skills
   continue-on-error: true
   with:
