@@ -154,6 +154,16 @@ Releases are Conventional-Commit driven and runnable from a laptop or CI with th
   (`goreleaser release --clean` attaches binaries, checksums, deb/rpm and AUR), then
   `release:major-tag` moves `v1` to the new tag, then `container:push` publishes the multi-arch
   image (`docker buildx`, needs QEMU for arm64 locally).
+- **Floating major tags must stay out of semrel's way.** semrel finds the last release with
+  `git describe --tags --abbrev=0`, and a floating tag (`v0`, `v1`) on the same commit as the
+  release tag wins that lookup, so semrel would report `v0` as the current version. Every task
+  that calls semrel depends on `release:drop-floating-tags`, which deletes those tags from the
+  local clone first (`git fetch --tags` restores them). `release:major-tag` takes the release tag
+  from `.semrel-release.json` (or the tags on `HEAD`), never from `git describe`, and tags the
+  peeled commit (`^{commit}`) so the floating tag is always a lightweight tag on a commit, never a
+  copy of semrel's annotated tag object. A copied tag object carries the release tag's name and
+  makes `git describe` print `v0.1.0-2-g<sha>`, which semrel resolves to `HEAD` and then reports
+  "No commits since last release".
 - Commit types that release: `feat` (minor), `fix`/`ref`/`build` (patch). Use `chore`, `docs`,
   `test`, `ci` for changes that must not release.
 - `.semrel.lock` pins `@semrel/provider-github`; it must be a version compatible with the pinned

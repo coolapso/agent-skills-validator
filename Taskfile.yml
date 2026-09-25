@@ -245,9 +245,23 @@ tasks:
     cmds:
       - goreleaser release --snapshot --clean --skip=publish,announce,aur
 
+  # semrel finds the last release with `git describe --tags --abbrev=0`. A floating
+  # major tag (v0, v1, ...) on the same commit as the release tag wins that lookup
+  # by ref order, so semrel would see "v0" as the current version and propose a
+  # version that already exists. Drop the floating tags from the local clone
+  # before anything calls semrel; `git fetch --tags` brings them back.
+  release:drop-floating-tags:
+    desc: "Delete local floating major tags (v0, v1, ...) so git describe and semrel only see release tags"
+    internal: true
+    silent: true
+    cmds:
+      - |
+        set -euo pipefail
+        { git tag --list 'v[0-9]*' | grep -Ex 'v[0-9]+' || true; } | xargs -r git tag -d >/dev/null
+
   release:dry-run:
     desc: "Check the semrel setup and show the next version and release notes it would create"
-    deps: [tools:semrel-plugins]
+    deps: [tools:semrel-plugins, release:drop-floating-tags]
     cmds:
       - semrel doctor
       - semrel release --dry-run
@@ -255,6 +269,7 @@ tasks:
   release:next-version:
     desc: "Print the next version semrel would release (empty when nothing is releasable)"
     silent: true
+    deps: [release:drop-floating-tags]
     cmds:
       - |
         semrel release --dry-run --no-color -o json 2>/dev/null \
@@ -266,7 +281,7 @@ tasks:
   # commits that are already on the branch.
   release:gh:
     desc: "Create the tag and GitHub release with semrel"
-    deps: [tools:semrel-plugins]
+    deps: [tools:semrel-plugins, release:drop-floating-tags]
     cmds:
       - |
         set -euo pipefail
@@ -302,15 +317,31 @@ tasks:
         [[ -z "$DISCORD_WEBHOOK_ID" ]] && unset DISCORD_WEBHOOK_ID DISCORD_WEBHOOK_TOKEN
         goreleaser release --clean
 
+  # The release tag comes from semrel's output file, or from the tags on HEAD
+  # when the task runs on its own; never from `git describe`, which the floating
+  # tag itself can confuse. The floating tag is created from the peeled commit
+  # (`^{commit}`) so it never copies semrel's annotated tag object: a copied tag
+  # object keeps the release tag's name inside it, and git describe then prints
+  # "v0.1.0-2-g<sha>" instead of "v0.1.0", which semrel resolves to HEAD.
   release:major-tag:
     desc: "Move the floating major tag (v0, v1, ...) to the latest release tag so `uses: coolapso/agent-skills-validator@v0` works"
     cmds:
       - |
         set -euo pipefail
-        tag="$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
+        tag=""
+        if [[ -f .semrel-release.json ]] && [[ "$(jq -r .released .semrel-release.json)" == "true" ]]; then
+          tag="$(jq -r '.next_version // empty' .semrel-release.json)"
+        fi
+        if [[ -z "$tag" ]]; then
+          tag="$(git tag --points-at HEAD --list 'v[0-9]*' --sort=-version:refname | grep -Ex 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)"
+        fi
+        if [[ -z "$tag" ]]; then
+          echo "No release tag found on HEAD; run release:gh first" >&2
+          exit 1
+        fi
         major="${tag%%.*}"
-        git tag -f "$major" "$tag"
-        git push -f origin "$major"
+        git tag -f "$major" "${tag}^{commit}"
+        git push -f origin "refs/tags/$major"
         echo "$major -> $tag"
 
   release:
