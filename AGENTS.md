@@ -86,6 +86,13 @@ external URLs or reference-link existence, and it never touches the network.
   changelog. semrel tags the commit that is already on the remote and creates the GitHub release;
   GoReleaser and the container push only publish artifacts. `release:gh` refuses to run on a
   dirty tree or when local and remote branches differ.
+- **The action's `matrix` input defaults to `true` and must keep today's behaviour.** With
+  `matrix: true`, `path` is a single skill directory passed to the CLI untouched, which is what
+  every caller using `path: ${{ matrix.skill }}` relies on; more than one line is exit 2 with a
+  hint. With `matrix: false`, `path` is newline-delimited and lines holding `*`, `?` or `[` are
+  glob-expanded by bash in the validate step (the CLI never globs); literal lines still go to the
+  CLI so a missing path stays a CLI exit 2. A composite action cannot create jobs, so the
+  job-per-skill fan-out lives in the caller's workflow. Changing the default is a breaking change.
 - **The action follows its own ref for the CLI version.** With `version` empty, the install step
   uses `github.action_ref`: an exact tag runs that CLI release, a major tag like `v1` runs the
   newest `v1.x` release (resolved by `site/install.sh` through the releases API), anything else
@@ -120,9 +127,6 @@ These are deliberate and must not be "fixed":
 - **One-level local reference checks** (does `references/REFERENCE.md` mentioned in `SKILL.md`
   exist?). Only consider this once the Agent Skills specification defines the exact parsing
   semantics for file references, and keep it disabled by default.
-- **Multiple paths in the action's `path` input** (newline-delimited). Add only if users ask; the
-  CLI already accepts many directories, so a matrix or a plain `run:` step covers it today.
-
 ## Secrets
 
 No GitHub repository secrets are used. Credentials live in the Infisical project `cicd`

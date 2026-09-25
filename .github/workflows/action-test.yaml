@@ -73,6 +73,62 @@ jobs:
           test -s "$JSON_FILE"
           python3 -c "import json,os; d=json.loads(os.environ['JSON']); assert d['skills'][0]['diagnostics'][0]['rule']=='AS004'"
 
+      - name: Several directories and a glob in one run with matrix false
+        id: many
+        uses: ./
+        continue-on-error: true
+        with:
+          version: ${{ needs.latest-release.outputs.version }}
+          matrix: false
+          path: |
+            internal/validator/testdata/valid/*/
+            internal/validator/testdata/invalid/as004-mismatch
+          format: json
+
+      - name: Assert the multi-path run
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.many.outcome }}
+          EXIT_CODE: ${{ steps.many.outputs.exit-code }}
+          JSON: ${{ steps.many.outputs.json }}
+        run: |
+          test "$OUTCOME" = "failure"
+          test "$EXIT_CODE" = "1"
+          python3 - <<'EOF'
+          import json, os
+          report = json.loads(os.environ["JSON"])
+          paths = [s["path"] for s in report["skills"]]
+          assert "internal/validator/testdata/valid/full" in paths, paths
+          assert paths[-1] == "internal/validator/testdata/invalid/as004-mismatch", paths
+          assert not any(p.endswith("/") for p in paths), paths
+          assert sum(1 for s in report["skills"] if not s["valid"]) == 1, paths
+          EOF
+
+      - name: Several directories with matrix true are misuse
+        id: many-matrix
+        uses: ./
+        continue-on-error: true
+        with:
+          version: ${{ needs.latest-release.outputs.version }}
+          path: |
+            internal/validator/testdata/valid/full
+            internal/validator/testdata/valid/bom
+
+      - name: A glob that matches nothing is misuse
+        id: nomatch
+        uses: ./
+        continue-on-error: true
+        with:
+          version: ${{ needs.latest-release.outputs.version }}
+          matrix: false
+          path: internal/validator/testdata/does-not-exist/*/
+
+      - name: Assert the misuse runs
+        shell: bash
+        run: |
+          test "${{ steps.many-matrix.outcome }}" = "failure"
+          test "${{ steps.nomatch.outcome }}" = "failure"
+
       - name: Warning becomes failure with strict
         id: strict
         uses: ./

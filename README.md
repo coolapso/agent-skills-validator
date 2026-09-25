@@ -143,7 +143,8 @@ jobs:
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `path` | `.` | Skill directory to validate. |
+| `path` | `.` | Skill directory to validate. With `matrix: false`, one directory or glob per line. |
+| `matrix` | `true` | `true`: `path` is one skill directory, so each skill runs in its own job. `false`: every directory or glob in `path` is validated in one run. |
 | `version` | Follows the action ref | CLI release to download: `0.1.0`, `v0` (newest 0.x) or `latest`. Empty follows the action ref, so `@v0.1.0` runs CLI 0.1.0 and `@v0` the newest 0.x. Once 1.0 ships, use `@v1`. |
 | `strict` | `false` | Pass `--strict`. |
 | `fail-on-warnings` | `false` | Pass `--fail-on-warnings`. |
@@ -158,17 +159,46 @@ jobs:
 The action downloads the release binary for the runner platform from GitHub Releases, verifies it
 against the published `checksums.txt`, and runs it. Linux, macOS and Windows runners are supported.
 
-Validate several skills with a matrix:
+Validate several skills with one job per skill (the default, `matrix: true`), so each shows up as
+its own check. The first job lists the skill directories, the second fans out over them:
 
 ```yaml
-strategy:
-  matrix:
-    skill: [skills/pdf-processing, skills/data-analysis]
-steps:
-  - uses: actions/checkout@v5
-  - uses: coolapso/agent-skills-validator@v0
-    with:
-      path: ${{ matrix.skill }}
+jobs:
+  list-skills:
+    runs-on: ubuntu-latest
+    outputs:
+      skills: ${{ steps.list.outputs.skills }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: list
+        run: echo "skills=$(ls -d skills/*/ | sed 's#/$##' | jq -Rcn '[inputs]')" >> "$GITHUB_OUTPUT"
+
+  validate-skill:
+    needs: list-skills
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        skill: ${{ fromJSON(needs.list-skills.outputs.skills) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: coolapso/agent-skills-validator@v0
+        with:
+          path: ${{ matrix.skill }}
+          strict: true
+```
+
+Or validate every skill in one job with `matrix: false`. `path` then takes one directory or glob
+per line; a glob that matches nothing fails the step with exit code 2:
+
+```yaml
+- uses: coolapso/agent-skills-validator@v0
+  with:
+    matrix: false
+    path: |
+      skills/*/
+      extra/pdf-processing
+    strict: true
 ```
 
 Consume the JSON report:

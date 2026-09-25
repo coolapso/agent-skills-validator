@@ -403,7 +403,8 @@ skills/data/SKILL.md:501: <span class="diag-warning">warning AS010</span>: SKILL
                     <div>
                         <h3 class="font-bold text-lg mb-3 dark:text-white">Inputs</h3>
                         <dl class="text-sm space-y-3 text-gray-600 dark:text-gray-300">
-                            <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">path</dt><dd>Skill directory to validate. Default <code>.</code></dd></div>
+                            <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">path</dt><dd>Skill directory to validate. With <code>matrix: false</code>, one directory or glob such as <code>skills/*/</code> per line. Default <code>.</code></dd></div>
+                            <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">matrix</dt><dd><code>true</code>: <code>path</code> is one skill directory, so each skill runs in its own job. <code>false</code>: every directory or glob in <code>path</code> is validated in one run. Default <code>true</code></dd></div>
                             <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">version</dt><dd>CLI release to download. Pinned per action release; <code>latest</code> is accepted.</dd></div>
                             <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">strict</dt><dd>Pass <code>--strict</code>. Default <code>false</code></dd></div>
                             <div><dt class="font-mono font-semibold text-gray-900 dark:text-gray-100">fail-on-warnings</dt><dd>Pass <code>--fail-on-warnings</code>. Default <code>false</code></dd></div>

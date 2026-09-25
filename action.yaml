@@ -7,9 +7,13 @@ branding:
 
 inputs:
   path:
-    description: "Skill directory to validate (a directory containing SKILL.md)"
+    description: "Skill directory to validate (a directory containing SKILL.md). With matrix false it takes several directories or globs such as skills/*/, one per line, and validates them all in this job."
     required: false
     default: "."
+  matrix:
+    description: "true (default): path is one skill directory, typically matrix.skill, so each skill runs in its own job. false: path lists directories or globs, one per line, and every match is validated in one run."
+    required: false
+    default: "true"
   version:
     description: "agent-skills-validator release to download, e.g. 1.2.3, v1 (newest 1.x) or latest. Empty (default) follows the action ref: an exact tag uses that release, a major tag such as v1 uses the newest release of that line, anything else uses the latest release."
     required: false
@@ -66,16 +70,49 @@ runs:
         [[ "$RUNNER_OS" == "Windows" ]] && suffix=".exe"
         echo "bin=${INSTALL_DIR}/agent-skills-validator${suffix}" >> "$GITHUB_OUTPUT"
 
-    - name: Validate skill
+    - name: Validate skills
       id: validate
       shell: bash
       env:
         ASV_BIN: ${{ steps.install.outputs.bin }}
         ASV_PATH: ${{ inputs.path }}
+        ASV_MATRIX: ${{ inputs.matrix }}
         ASV_STRICT: ${{ inputs.strict }}
         ASV_FAIL_ON_WARNINGS: ${{ inputs.fail-on-warnings }}
         ASV_FORMAT: ${{ inputs.format }}
       run: |
+        # path is one pattern per line. With matrix true (the default) it must
+        # be a single directory and is passed through untouched, as it always
+        # was. With matrix false every line is used, and a line holding glob
+        # characters is expanded here because the CLI never globs; literal
+        # paths still go to the CLI so it reports a missing one as exit 2.
+        skills=()
+        while IFS= read -r line || [[ -n "$line" ]]; do
+          line="${line#"${line%%[![:space:]]*}"}"
+          line="${line%"${line##*[![:space:]]}"}"
+          [[ -z "$line" ]] && continue
+          if [[ "$ASV_MATRIX" == "false" && "$line" == *[\*\?\[]* ]]; then
+            if ! matches="$(compgen -G "$line")"; then
+              echo "::error::path pattern '${line}' matches nothing"
+              exit 2
+            fi
+            while IFS= read -r match; do
+              skills+=("${match%/}")
+            done <<< "$matches"
+          else
+            skills+=("$line")
+          fi
+        done <<< "$ASV_PATH"
+
+        if [[ ${#skills[@]} -eq 0 ]]; then
+          echo "::error::path is empty; give at least one skill directory"
+          exit 2
+        fi
+        if [[ "$ASV_MATRIX" != "false" && ${#skills[@]} -gt 1 ]]; then
+          echo "::error::path lists ${#skills[@]} directories but matrix is true; pass one directory per job (for example matrix.skill) or set matrix: false to validate them all in this job"
+          exit 2
+        fi
+
         set +e
         args=(validate --format "$ASV_FORMAT")
         [[ "$ASV_STRICT" == "true" ]] && args+=(--strict)
@@ -83,7 +120,7 @@ runs:
 
         if [[ "$ASV_FORMAT" == "json" ]]; then
           report="${RUNNER_TEMP}/agent-skills-validator-report.json"
-          "$ASV_BIN" "${args[@]}" "$ASV_PATH" > "$report"
+          "$ASV_BIN" "${args[@]}" "${skills[@]}" > "$report"
           code=$?
           cat "$report"
           echo "json-file=$report" >> "$GITHUB_OUTPUT"
@@ -93,7 +130,7 @@ runs:
             echo "ASV_EOF"
           } >> "$GITHUB_OUTPUT"
         else
-          "$ASV_BIN" "${args[@]}" "$ASV_PATH"
+          "$ASV_BIN" "${args[@]}" "${skills[@]}"
           code=$?
           echo "json-file=" >> "$GITHUB_OUTPUT"
           echo "json=" >> "$GITHUB_OUTPUT"
